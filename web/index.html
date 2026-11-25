@@ -1,34 +1,8 @@
-<!doctype html>
-<html lang="en-CA">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="{{DESCRIPTION}}">
-  <title>{{TITLE}} · CoolCode</title>
-  <link rel="stylesheet" href="./style.css">
-  <script type="module" src="./app.mjs"></script>
-  {{VISIT_COUNTER}}
-</head>
-<body data-tool-id="{{TOOL_ID}}">
-  <a class="skip" href="#main">Skip to content</a>
-  <header><a href="https://coolcode.ca/">← CoolCode.ca</a><a href="{{SOURCE_URL}}">Source &amp; instructions ↗</a></header>
-  <main id="main">
-    <p class="eyebrow">Browser tool starter</p>
-    <h1>{{TITLE}}</h1>
-    <p class="intro">{{DESCRIPTION}}</p>
-    <section aria-labelledby="example-title">
-      <h2 id="example-title">Clean a list</h2>
-      <p>Trim spaces, skip blank lines and remove exact duplicates. Capitalization stays distinct.</p>
-      <div class="panels">
-        <div><label for="input">Your lines</label><textarea id="input" rows="10" maxlength="100000" spellcheck="false" placeholder="Paste one item per line"></textarea></div>
-        <div><label for="output">Cleaned lines</label><textarea id="output" rows="10" readonly spellcheck="false"></textarea></div>
-      </div>
-      <div class="actions"><button id="sample" type="button">Load example</button><button id="clear" type="button">Clear</button><button id="copy" type="button" hidden>Copy result</button></div>
-      <p id="status" role="status" aria-live="polite">Paste a list to begin.</p>
-      <noscript><p>This tool needs JavaScript to process your text. The source is available above.</p></noscript>
-    </section>
-    <aside aria-label="Privacy"><strong>Stays on your device.</strong> The browser processes your text in this tab. Reloading clears it.</aside>
-  </main>
-  <footer>Part of <a href="https://coolcode.ca/">the CoolCode collection</a>. {{ISSUE_LINK}}</footer>
-</body>
-</html>
+<!doctype html><html lang="en-CA"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="{{DESCRIPTION}}"><title>Halifax Bus &amp; Ferry Departures · {{TITLE}}</title><link rel="stylesheet" href="./style.css"><script type="module" src="./app.mjs"></script>{{VISIT_COUNTER}}</head>
+<body data-tool-id="{{TOOL_ID}}"><a class="skip" href="#main">Skip to departures</a><header><nav><a href="https://coolcode.ca/">← CoolCode</a><span>HALIFAX · NOVA SCOTIA</span><a href="{{SOURCE_URL}}">Source &amp; guide ↗</a></nav><div class="hero"><div><p class="eyebrow">THE NEXT BUS. THE NEXT FERRY.</p><h1>{{TITLE}}</h1><p class="intro">Less waiting. More knowing.<br>Find your stop and see what’s coming.</p></div><div class="hero-sign" aria-hidden="true"><span>NEXT</span><strong>→</strong><span>BUS / FERRY</span></div></div></header>
+<main id="main"><p id="load-status" role="status">Loading Halifax Transit’s schedule…</p><p id="edition-warning" class="warning" hidden></p><div id="app" hidden>
+<section class="search-panel"><div class="section-heading"><h2>Where are you leaving from?</h2><button id="nearby" class="secondary" type="button">Find stops near me</button></div><div class="controls"><label class="search-label">Stop number or street<input id="search" type="search" placeholder="Try 8330, Spring Garden or ferry" autocomplete="off" aria-controls="stop-results"></label><label>Route<select id="route"><option value="">All bus &amp; ferry routes</option></select></label><label>Departure date<input id="date" type="date"></label></div><p id="search-status" class="small"></p><div id="stop-results" class="stop-results"></div><details><summary>Ferry terminals</summary><div id="ferries" class="chips"></div></details><div id="saved" class="chips" aria-label="Saved stops"></div></section>
+<section id="board" aria-labelledby="stop-title"><div class="section-heading"><div><p class="eyebrow" id="stop-code"></p><h2 id="stop-title">Choose a stop</h2></div><button id="save" class="secondary" type="button">Save stop on this device</button></div><div class="board-top"><p id="live-status" role="status">Live updates are checked when you choose a stop.</p><button id="refresh" type="button">Refresh live</button></div><div class="board-grid"><div><div id="departures" class="departures"></div><button id="more" class="secondary" hidden>Show more departures</button></div><aside><h3>Last service</h3><p class="small">Last scheduled departure for the selected service date. After-midnight trips can appear on the following calendar day.</p><div id="last"></div><p class="small">Scheduled means a timetable time. Only a fresh prediction is labelled live. Arrive a few minutes early.</p></aside></div></section>
+<section><div class="section-heading"><h2>Service alerts</h2><span id="alert-status" class="small"></span></div><div id="alerts"></div></section>
+<section><div class="section-heading"><div><h2>Vehicles near this stop</h2><p id="vehicle-status" class="small"></p></div><button id="map-toggle" class="secondary">Show street map</button></div><div id="map" class="map" hidden aria-label="Vehicle locations on an OpenStreetMap street map"></div><div id="vehicle-list" class="chips"></div><p class="small">Vehicle positions are separate from departure predictions. Some services, including ferries, may have no live position. The map loads OpenStreetMap tiles only when opened.</p></section>
+<section class="about"><h2>A little context before you go</h2><p id="coverage"></p><p>Times use Halifax local time. This is an independent passenger information tool. A missing vehicle or prediction does not mean a trip is cancelled. Check Halifax Transit for detours, accessibility and last-minute changes.</p><p><a href="https://www.halifax.ca/transportation/halifax-transit">Halifax Transit</a> · <a href="https://www.halifax.ca/transportation/halifax-transit/ferry-service">Ferry service</a> · <a href="https://data-hrm.hub.arcgis.com/pages/open-data-licence">Halifax Open Data Licence</a></p><details><summary>Privacy and saved stops</summary><p>Stop searches run in your browser. Selecting a stop sends its public stop ID to CoolCode’s gateway to retrieve Halifax Transit data. The optional location button uses your browser’s location permission; coordinates stay in this page. Saving a stop stores its ID on this device. No account, cookies or sign-in is needed. An open map requests tiles from OpenStreetMap. CoolCode counts aggregate tool visits.</p><button id="clear-saved" class="secondary">Clear saved stops</button></details></section></div></main><footer>{{ISSUE_LINK}}<span>Built for the everyday journey.</span></footer></body></html>

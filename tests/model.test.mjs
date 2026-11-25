@@ -1,21 +1,14 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { cleanLines } from '../web/model.mjs';
-test('trims, removes blanks and preserves first-seen order', () => {
-  assert.deepEqual(cleanLines('  Halifax\nLangley\nHalifax\n\nVancouver  '), {
-    text: 'Halifax\nLangley\nVancouver', count: 3, removed: 1,
-  });
-});
-test('supports Windows and old Mac line endings', () => {
-  assert.equal(cleanLines('a\r\nb\ra').text, 'a\nb');
-});
-test('empty text and whitespace produce an empty result', () => {
-  assert.deepEqual(cleanLines(' \n\t'), { text: '', count: 0, removed: 0 });
-});
-test('preserves case and Unicode', () => {
-  assert.equal(cleanLines('Québec\nquébec\n東京\nQuébec').text, 'Québec\nquébec\n東京');
-});
-test('treats markup as ordinary text', () => {
-  assert.equal(cleanLines('<script>alert(1)</script>\n<script>alert(1)</script>').text, '<script>alert(1)</script>');
-});
-test('rejects non-text input', () => { assert.throws(() => cleanLines(null), TypeError); });
+import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
+import {localDate,activeService,serviceEpoch,matchingStops,feedState,scheduled,withLive,departures,activeAlerts,safeLink} from '../web/model.mjs';
+const index=JSON.parse(readFileSync(new URL('../web/data/index.json',import.meta.url))),service={start:'2026-01-01',end:'2026-12-31',days:[0,1,1,1,1,1,0],exceptions:{'2026-11-25':2,'2026-11-28':1}};
+test('calendar exceptions override weekdays and bounds',()=>{assert.equal(activeService(service,'2026-11-25'),false);assert.equal(activeService(service,'2026-11-28'),true);assert.equal(activeService(service,'2026-11-29'),false);assert.equal(activeService(service,'2027-01-04'),false)});
+test('Atlantic service time uses seasonal UTC offset and >24 hour times',()=>{assert.equal(new Date(serviceEpoch('2026-11-25')).toISOString(),'2026-11-25T04:00:00.000Z');assert.equal(new Date(serviceEpoch('2026-07-25')).toISOString(),'2026-07-25T03:00:00.000Z');assert.equal(localDate(serviceEpoch('2026-11-25')+25*3600000),'2026-11-26')});
+test('all actual passenger stops and routes are searchable, plus expanded captures',()=>{assert.ok(index.stops.length>2000);assert.ok(index.routes.length>=81);assert.equal(matchingStops(index,'8330')[0].id,'8330');const expanded={...index,stops:[...index.stops,{id:'new-X',code:'new-X',name:'New road',routes:['new-route']}]};assert.equal(matchingStops(expanded,'new road','new-route')[0].id,'new-X')});
+const now=Date.parse('2026-11-25T17:00:00Z'),row={trip:'t',route:'1',date:'2026-11-25',sequence:3,scheduled:now+600000,time:now+600000,kind:'scheduled'};
+function update(stop={id:'s',sequence:3,relationship:0,departure:{time:now/1000+900,delay:null},arrival:{time:null,delay:null}}){return {data:{timestamp:now/1000,entities:[{trip:{id:'t',date:'20261125',relationship:0},timestamp:now/1000,delay:null,stops:[stop]}]}}}
+test('fresh prediction takes precedence while stale feed cannot masquerade as live',()=>{const live=update();assert.equal(withLive([row],'s',live,now)[0].time,now+900000);assert.equal(withLive([row],'s',live,now+181000)[0].kind,'scheduled');assert.equal(feedState({data:{timestamp:now/1000,entities:[]}},now),'empty');assert.equal(feedState(null,now),'unavailable')});
+test('cancelled, skipped, no-data, wrong service date and negative delay stay distinct',()=>{let u=update();u.data.entities[0].trip.relationship=3;assert.equal(withLive([row],'s',u,now)[0].kind,'cancelled');u=update({id:'s',relationship:1});assert.equal(withLive([row],'s',u,now)[0].kind,'skipped');u=update({id:'s',relationship:2});assert.equal(withLive([row],'s',u,now)[0].kind,'scheduled');u=update();u.data.entities[0].trip.date='20261124';assert.equal(withLive([row],'s',u,now)[0].kind,'scheduled');u=update({id:'',sequence:3,relationship:0,departure:{time:null,delay:-120}});assert.equal(withLive([row],'s',u,now)[0].time,row.scheduled-120000)});
+test('pickup restrictions and previous service-day trips after midnight',()=>{const i={start:'2026-11-24',through:'2026-11-29',trips:[['t','1','s','Destination']],services:{s:{start:'2026-11-24',end:'2026-11-29',days:[1,1,1,1,1,1,1],exceptions:{}}}};assert.equal(scheduled(i,[[0,90000,3,1]],'2026-11-25').length,0);const r=departures(i,[[0,90000,3,0]],'s','2026-11-25','',null,Date.parse('2026-11-25T04:30:00Z'));assert.equal(r[0].date,'2026-11-24');assert.equal(r[0].time,Date.parse('2026-11-25T05:00:00Z'))});
+test('alerts respect active periods and selected stop, unsafe source links refused',()=>{const r={data:{entities:[{id:'a',periods:[{start:now/1000-1,end:now/1000+20}],targets:[{route:'1',stop:'s'}]},{id:'b',periods:[{start:0,end:1}],targets:[]}]}};assert.equal(activeAlerts(r,'s',['1'],now).length,1);assert.equal(activeAlerts(r,'other',['1'],now).length,0);assert.equal(safeLink('javascript:alert(1)'),null)});
+
+test('DELETED trips are removed from the passenger board',()=>{const i={start:'2026-11-25',through:'2026-11-25',trips:[['t','1','s','Destination']],services:{s:{start:'2026-11-25',end:'2026-11-25',days:[1,1,1,1,1,1,1],exceptions:{}}}};const u=update();u.data.entities[0].trip.relationship=7;assert.equal(departures(i,[[0,14*3600,3,0]],'s','2026-11-25','',u,now).length,0)});

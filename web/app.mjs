@@ -1,37 +1,44 @@
-import { cleanLines } from './model.mjs';
-const input = document.querySelector('#input');
-const output = document.querySelector('#output');
-const status = document.querySelector('#status');
-const copy = document.querySelector('#copy');
-function update() {
-  const result = cleanLines(input.value);
-  output.value = result.text;
-  status.textContent = `${result.count} unique ${result.count === 1 ? 'line' : 'lines'}; ${result.removed} ${result.removed === 1 ? 'duplicate' : 'duplicates'} removed.`;
-  copy.disabled = result.count === 0;
+import {ZONE,localDate,matchingStops,feedState,scheduled,departures,activeAlerts,safeLink,mercator} from './model.mjs';
+const $=id=>document.getElementById(id),el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n};
+let index,config,stop,rows=[],live={},saved=[],shown=15,selection=0,mapOpen=false,loading=false;
+const buckets=new Map(),key='coolcode:halifaxnext:stops';
+const fmt=(ms,day=false)=>new Intl.DateTimeFormat('en-CA',{timeZone:ZONE,hour:'numeric',minute:'2-digit',...(day?{month:'short',day:'numeric'}:{})}).format(ms);
+function routeName(id){const r=index.routes.find(r=>r.id===id);return r?.short||r?.id||id}
+function prefs(){try{const p=JSON.parse(localStorage.getItem(key)||'[]');saved=Array.isArray(p)?p.filter(id=>index.stops.some(s=>s.id===id)).slice(0,30):[]}catch{saved=[]}}
+function savePrefs(){try{localStorage.setItem(key,JSON.stringify(saved));renderSaved()}catch{$('search-status').textContent='This browser could not save your stops. You can still bookmark the stop URL.'}}
+function renderSaved(){$('saved').replaceChildren(...saved.map(id=>{const s=index.stops.find(s=>s.id===id),b=el('button','★ '+s.name,'secondary');b.onclick=()=>choose(id);return b}));$('save').textContent=saved.includes(stop?.id)?'Remove saved stop':'Save stop on this device'}
+function search(){const matches=matchingStops(index,$('search').value,$('route').value);$('search-status').textContent=matches.length+' matching stops'+(matches.length>40?' · Showing the first 40. Type a street or stop number to narrow the list.':'');$('stop-results').replaceChildren(...matches.slice(0,40).map(s=>{const b=el('button',s.name,s.id===stop?.id?'selected':'');b.onclick=()=>choose(s.id);return b}))}
+function setURL(){const u=new URL(location.href);u.searchParams.set('stop',stop.id);if($('route').value)u.searchParams.set('route',$('route').value);else u.searchParams.delete('route');if($('date').value!==localDate())u.searchParams.set('date',$('date').value);else u.searchParams.delete('date');history.replaceState(null,'',u)}
+async function choose(id){const selected=index.stops.find(s=>s.id===id);if(!selected)return;const ticket=++selection;stop=selected;shown=15;rows=[];live.trips=undefined;live.tripsError=undefined;$('stop-title').textContent=stop.name;$('stop-code').textContent='STOP '+stop.code+' · '+stop.routes.length+' ROUTES';$('departures').textContent='Loading stop timetable…';if($('route').value&&!stop.routes.includes($('route').value))$('route').value='';renderSaved();search();setURL();
+ try{if(!buckets.has(stop.bucket)){const r=await fetch('./data/stops-'+stop.bucket+'.json?v='+index.sha256);if(!r.ok)throw Error();const b=await r.json();if(b.edition!==index.sha256||b.schema!==1)throw Error();buckets.set(stop.bucket,b.stops)}if(ticket!==selection)return;rows=buckets.get(stop.bucket)[id]||[];render();await refresh()}
+ catch{if(ticket===selection)$('departures').textContent='This stop timetable could not be loaded. Reload the page to retrieve a consistent schedule edition.'}
 }
-input.addEventListener('input', update);
-document.querySelector('#sample').addEventListener('click', () => {
-  input.value = '  Halifax\nLangley\nHalifax\n\nVancouver  ';
-  update();
-});
-document.querySelector('#clear').addEventListener('click', () => {
-  input.value = '';
-  update();
-  input.focus();
-});
-if (navigator.clipboard && window.isSecureContext) {
-  copy.hidden = false;
-  copy.disabled = true;
-  copy.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(output.value);
-      status.textContent = 'Result copied.';
-    } catch {
-      output.focus();
-      output.select();
-      status.textContent = 'Copy was unavailable. The result is selected so you can copy it manually.';
-    }
-  });
+function stamp(feed){const r=live[feed];return r?.data?.timestamp?'Source '+fmt(r.data.timestamp*1000,true):'No source timestamp'}
+function render(){if(!stop)return;const now=Date.now(),date=$('date').value,today=localDate(now),route=$('route').value;
+ if(!date||date<index.start||date>index.through){$('departures').textContent='Choose a date within the published schedule: '+index.start+' to '+index.through+'.';return}
+ const list=departures(index,rows,stop.id,date,route,live.trips,now,config.stale_seconds),state=feedState(live.trips,now,config.stale_seconds);
+ $('live-status').textContent=date!==today?'Showing the selected day’s timetable. Live updates apply to today only.':state==='live'?'Live predictions checked · '+stamp('trips')+'. Timetable times remain labelled scheduled.':state==='empty'?'The live feed has no predictions for this stop · '+stamp('trips')+'. Showing scheduled times.':state==='stale'?'The live source is stale · '+stamp('trips')+'. Showing scheduled times.':(live.tripsError||'Live updates not yet available.')+' Showing scheduled times.';
+ $('departures').replaceChildren(...list.slice(0,shown).map(r=>{const item=el('article',undefined,'departure'),pill=el('span',routeName(r.route),'route-pill'),body=el('div'),time=el('div',undefined,'time');body.append(el('h3',r.headsign||index.routes.find(x=>x.id===r.route)?.name||'Trip '+r.trip));const detail=[];if(r.kind==='live'){const delta=Math.round((r.time-r.scheduled)/60000);detail.push('Scheduled '+fmt(r.scheduled)+(delta>0?' · '+delta+' min later':delta<0?' · '+Math.abs(delta)+' min earlier':' · on time'));if(r.uncertainty)detail.push('Prediction uncertainty ±'+Math.ceil(r.uncertainty/60)+' min')}else detail.push(localDate(r.time)!==date?'Departs '+localDate(r.time):'Timetable departure');body.append(el('p',detail.join(' · ')));const minutes=Math.ceil((r.time-now)/60000);time.append(el('span',date===today&&minutes>=0&&minutes<60?(minutes===0?'Due':minutes+' min'):fmt(r.time)),el('span',r.kind,'badge '+r.kind));item.append(pill,body,time);return item}));if(!list.length)$('departures').textContent='No scheduled departures remain for this selection. Try another route, stop or service date.';
+ $('more').hidden=list.length<=shown;const all=scheduled(index,rows,date,route),last=new Map();for(const r of all)if(!last.has(r.route)||last.get(r.route).time<r.time)last.set(r.route,r);
+ $('last').replaceChildren(...[...last.values()].sort((a,b)=>a.time-b.time).map(r=>el('p',routeName(r.route)+' · '+fmt(r.time,true)+(date===today&&r.time<now?' · passed':''))));if(!last.size)$('last').textContent='No service on this date.';
+ const alerts=activeAlerts(live.alerts,stop.id,route?[route]:stop.routes,now),astate=feedState(live.alerts,now,config.stale_seconds);$('alert-status').textContent=astate==='unavailable'?'Alerts unavailable':(astate==='stale'?'Stale · ':'')+stamp('alerts');$('alerts').replaceChildren(...alerts.map(a=>{const box=el('article',undefined,'alert');box.append(el('h3',a.header||'Transit alert'),el('p',a.description));const u=safeLink(a.url);if(u){const link=el('a','Read the source alert ↗');link.href=u;link.rel='noopener noreferrer';box.append(link)}return box}));if(!alerts.length)$('alerts').textContent=astate==='unavailable'?'Service alerts could not be checked. Consult Halifax Transit before travelling.':astate==='stale'?'No relevant alert in the stale capture. Current alerts are unknown.':'No active alert in this capture for the selected stop and routes.';
+ renderVehicles();setURL();
 }
-// Namespace future preference storage as coolcode:<tool-id>:<key>.
-// Do not persist pasted text or uploads by default.
+function relevantVehicles(){return (live.vehicles?.data?.entities||[]).filter(v=>(!$('route').value?stop.routes.includes(v.trip.route):v.trip.route===$('route').value)&&Number.isFinite(v.lat)&&Number.isFinite(v.lon))}
+function renderVehicles(){if(!stop)return;const state=feedState(live.vehicles,Date.now(),config.stale_seconds),vehicles=state==='live'?relevantVehicles().filter(v=>!v.timestamp||Math.abs(Date.now()/1000-v.timestamp)<=config.stale_seconds):[];$('vehicle-status').textContent=state==='unavailable'?'Vehicle positions unavailable.':state==='stale'?'Positions are stale; markers are hidden. '+stamp('vehicles'):state==='empty'?'The source currently has no vehicle positions. '+stamp('vehicles'):vehicles.length+' vehicles on the selected routes · '+stamp('vehicles');$('vehicle-list').replaceChildren(...vehicles.slice(0,20).map(v=>el('span','Route '+routeName(v.trip.route)+' · vehicle '+(v.vehicle||v.id))));
+ if(!mapOpen)return;const map=$('map'),w=map.clientWidth||600,h=360,z=13,center=mercator(stop.lat,stop.lon,z),left=center.x-w/2,top=center.y-h/2;map.replaceChildren();
+ for(let x=Math.floor(left/256);x<=Math.floor((left+w)/256);x++)for(let y=Math.floor(top/256);y<=Math.floor((top+h)/256);y++){const img=el('img');img.src='https://tile.openstreetmap.org/'+z+'/'+x+'/'+y+'.png';img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';img.style.left=x*256-left+'px';img.style.top=y*256-top+'px';map.append(img)}
+ function marker(lat,lon,text,cls){const p=mercator(lat,lon,z),x=p.x-left,y=p.y-top;if(x<0||x>w||y<0||y>h)return;const n=el('span',text,'map-marker '+cls);n.style.left=x+'px';n.style.top=y+'px';map.append(n)}marker(stop.lat,stop.lon,'STOP '+stop.code,'stop');for(const v of vehicles)marker(v.lat,v.lon,routeName(v.trip.route)+' · '+(v.vehicle||v.id),'');const credit=el('a','© OpenStreetMap contributors','attribution');credit.href='https://www.openstreetmap.org/copyright';map.append(credit)
+}
+async function refresh(){if(!stop||loading||document.hidden)return;loading=true;$('refresh').disabled=true;const ticket=selection,current=stop.id;
+ await Promise.all(['trips','vehicles','alerts'].map(async feed=>{try{const u=new URL(config.api);u.searchParams.set('feed',feed);if(feed==='trips')u.searchParams.set('stop',current);const r=await fetch(u,{signal:AbortSignal.timeout(18000),credentials:'omit'});const result=await r.json();if(!r.ok)throw Error(result.error?.message||'Live service unavailable.');if(result.data?.schema!==1||result.data?.feed!==feed)throw Error('Unexpected live feed.');if(ticket===selection||feed!=='trips'){live[feed]=result;live[feed+'Error']=undefined}}catch(e){if(ticket===selection||feed!=='trips'){live[feed+'Error']=e.message||'Live source unavailable.';live[feed]=undefined}}}));loading=false;$('refresh').disabled=false;if(ticket===selection)render();else refresh();
+}
+async function start(){const responses=await Promise.all([fetch('./config.json'),fetch('./data/index.json')]);if(responses.some(r=>!r.ok))throw Error();[config,index]=await Promise.all(responses.map(r=>r.json()));if(index.schema!==1||!index.stops.length)throw Error();prefs();$('load-status').textContent=index.routes.length+' routes · '+index.stops.length.toLocaleString()+' passenger stops · Halifax local time';$('app').hidden=false;$('date').min=index.start;$('date').max=index.through;const query=new URLSearchParams(location.search),today=localDate();$('date').value=query.get('date')>=index.start&&query.get('date')<=index.through?query.get('date'):today;
+ if(today>index.through||today<index.start){$('edition-warning').hidden=false;$('edition-warning').textContent='This schedule covers '+index.start+' to '+index.through+' and does not cover today. Current departures are unavailable. You can inspect dates within the saved edition.'}else if(Date.parse(index.through)-Date.parse(today)<5*86400000){$('edition-warning').hidden=false;$('edition-warning').textContent='This timetable ends '+index.through+'. Schedules are checked daily; trips after that date will appear when Halifax publishes the next edition.'}
+ for(const r of [...index.routes].sort((a,b)=>a.type===4?-1:b.type===4?1:a.short.localeCompare(b.short,undefined,{numeric:true})))$('route').add(new Option((r.type===4?'Ferry · ':'')+(r.short||r.id)+' · '+r.name,r.id));if(index.routes.some(r=>r.id===query.get('route')))$('route').value=query.get('route');
+ const ferryIds=index.routes.filter(r=>r.type===4).map(r=>r.id);for(const s of index.stops.filter(s=>s.routes.some(r=>ferryIds.includes(r)))){const b=el('button',s.name,'secondary');b.onclick=()=>choose(s.id);$('ferries').append(b)}
+ $('coverage').textContent='Official schedule '+index.edition+' covers '+index.start+' to '+index.through+'. Download checked '+new Date(index.retrieved).toLocaleString('en-CA',{timeZone:ZONE})+' Halifax time. '+index.trips.length.toLocaleString()+' trips; '+index.stop_times.toLocaleString()+' stop times. Daily checks do not extend the source’s valid date range.';
+ $('search').oninput=search;$('route').onchange=()=>{search();shown=15;render()};$('date').onchange=()=>{shown=15;render()};$('refresh').onclick=refresh;$('more').onclick=()=>{shown+=30;render()};$('save').onclick=()=>{if(!stop)return;saved=saved.includes(stop.id)?saved.filter(id=>id!==stop.id):[...saved,stop.id].slice(-30);savePrefs()};$('clear-saved').onclick=()=>{saved=[];savePrefs()};$('map-toggle').onclick=()=>{mapOpen=!mapOpen;$('map').hidden=!mapOpen;$('map-toggle').textContent=mapOpen?'Hide street map':'Show street map';renderVehicles()};$('nearby').onclick=()=>{if(!navigator.geolocation){$('search-status').textContent='Location is unavailable in this browser.';return}$('search-status').textContent='Waiting for your browser’s location permission…';navigator.geolocation.getCurrentPosition(p=>{const lat=p.coords.latitude,lon=p.coords.longitude,s=[...index.stops].sort((a,b)=>((a.lat-lat)**2+(a.lon-lon)**2*Math.cos(lat*Math.PI/180)**2)-((b.lat-lat)**2+(b.lon-lon)**2*Math.cos(lat*Math.PI/180)**2))[0];if(Math.abs(s.lat-lat)+Math.abs(s.lon-lon)>1){$('search-status').textContent='Your location is outside the Halifax stop network. Search a street or stop number instead.';return}$('search').value=s.id;choose(s.id)},()=>{$('search-status').textContent='Location was not available. Search a street or stop number instead.'},{timeout:12000,maximumAge:60000})};
+ await choose(index.stops.some(s=>s.id===query.get('stop'))?query.get('stop'):saved[0]||config.default_stop||index.stops[0].id);setInterval(()=>{if(!document.hidden){render();refresh()}},Math.max(30,config.poll_seconds)*1000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){render();refresh()}})
+}
+start().catch(()=>{$('load-status').textContent='The schedule could not be loaded. Reload this page to try again.'});

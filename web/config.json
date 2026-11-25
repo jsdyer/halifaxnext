@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "api": "https://coolcode.ca/api/halifaxnext/realtime",
+  "default_stop": "8330",
+  "poll_seconds": 60,
+  "stale_seconds": 180,
+  "bucket_count": 64
+}

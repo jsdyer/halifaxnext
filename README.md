@@ -1,179 +1,44 @@
-# CoolCode browser tool template
+# Halifax Next
 
-A starting point for independent tools at `coolcode.ca/<repo>/`: a working local-text
-example, responsive UI, Python standard-library build, Node tests, PR checks and Pages
-publication. No npm install is needed.
+[Find your next Halifax bus or ferry](https://coolcode.ca/halifaxnext/)
 
-## Using the example
+Search any passenger stop by its number or street, filter by route, inspect a service date, and see next departures plus the last scheduled trip. Ferry-terminal shortcuts include Alderney and Woodside. Optional device favourites survive refresh; the stop URL can also be bookmarked. A street map shows fresh vehicle positions when the agency provides them.
 
 <!-- coolcode:guide -->
-The first occurrence of each trimmed line keeps its place. Compare the output with the original text before copying the result.
+Search 8330 for Spring Garden Road before Dresden Row, or open a ferry-terminal shortcut. Live labels require a fresh source prediction; scheduled times are timetable entries, and a missing position does not mean a trip is cancelled. Last service uses the selected service date, including trips after midnight.
 <!-- /coolcode:guide -->
 
-For a real tool, replace this paragraph with one or two plain-text sentences
-about an example, a limit or how to interpret the results. Keep the source,
-coverage, refresh behaviour and a worked example in this README as appropriate.
-When updating a tool, revise any details its behaviour has changed and keep the
-homepage's shorter data-source sentence in `tool.json` accurate.
-The hub imports the marked note into the catalogue README.
+## Sources, dates and limits
 
-## One-time template setup
+[Halifax Transit static GTFS](https://gtfs.halifax.ca/static/google_transit.zip) supplies every passenger stop, route, service calendar, exception date and stop time. The initial edition has 81 routes, 2,347 passenger stops, 9,239 trips and 324,165 stop times, including Alderney and Woodside ferries. Eleven parent-station records are omitted from boarding-stop search. Counts come from each edition, not a fixed list. The current edition ends November 29, 2026; **retrieving it again does not extend that validity**. Dates outside the edition never receive a fabricated timetable.
 
-Enable **Settings → General → Template repository** here. This repository does not
-need Pages enabled: its workflow builds/tests but intentionally skips deployment.
-New copies also skip deployment until `scripts/init.py` sets the tool ID to match
-their repository name. This lets you create the repo before configuring Pages.
+Official public real-time feeds:
 
-## Start a new tool
+- `https://gtfs.halifax.ca/realtime/Vehicle/VehiclePositions.pb`
+- `https://gtfs.halifax.ca/realtime/TripUpdate/TripUpdates.pb`
+- `https://gtfs.halifax.ca/realtime/Alert/Alerts.pb`
 
-1. Select **Use this template → Create a new repository**, choose owner `jsdyer`,
-   a unique lowercase name such as `my-tool`, and public visibility.
-2. Clone the new repository. Use Python 3.12+ and Node 24+.
-3. Set the identity, using a slug that matches the repository name:
+The shared CoolCode Worker exposes `GET /api/halifaxnext/realtime?feed=trips&stop=8330` and `feed=vehicles` / `feed=alerts`. It validates and normalizes bounded GTFS-realtime messages, caches source captures for 30 seconds, and returns `fetched_at` separately from the source's Unix-second `data.timestamp`. Valid empty, stale, missing and failed feeds stay distinct. The page polls once per minute while visible. Predictions older than three minutes fall back to explicitly labelled timetable times. Cancelled trips, skipped stops, service dates, negative delays and sequence-only updates are handled. Timetable times use GTFS service-day semantics, including hours after 24:00 and calendar exceptions. The tool does not infer that a missing prediction is on time.
 
-```sh
-python3 scripts/init.py my-tool --title "My Tool" --description "Describe what this tool does."
-```
+Data: [Halifax Open Data Licence](https://data-hrm.hub.arcgis.com/pages/open-data-licence). Independent information, with no affiliation or endorsement. Positions and predictions can be incomplete, especially ferry service. Check [Halifax Transit](https://www.halifax.ca/transportation/halifax-transit) for travel decisions. Street-map tiles are © OpenStreetMap contributors.
 
-Review the category, tags and icon in `tool.json`. `access: "browser"` tells the main
-catalogue that the tool works immediately without installation. `--owner` supports a different
-GitHub owner, but only projects owned by `jsdyer` inherit the CoolCode domain.
+## Expand or customize
 
-4. Replace the example in `web/` and its tests. Update the privacy explanation,
-   source attribution and README to describe the real tool.
-5. Test and preview:
+Edit `web/config.json`: `default_stop` is any passenger `stop_id` in the feed; `poll_seconds` (minimum30) and `stale_seconds` control polling and source age. Set `api` to the deployed gateway. Change `bucket_count` only with a refresh; all real stops remain searchable regardless of the number of buckets. Starter IDs never constrain visitor input. To use a new default, edit the file, run the offline checks below, then push to main. To refresh source coverage, run `python3 scripts/refresh.py`, inspect `web/status.json`, run the checks and commit `web/data/` plus status. Previously captured editions with different route/stop counts remain readable.
+
+The schedule workflow runs daily at **08:17 UTC**, and via `workflow_dispatch`. It validates the complete source before replacing the saved edition and publishes only after application, build and browser checks pass. An expired source fails collection, preserving the prior publication. The separately allowlisted weekly schedule guard restores workflows disabled for inactivity; the independent Linux watchdog must also dispatch `.github/workflows/pages.yml`, monitor `status.json.retrieved` (36-hour maximum), and verify `status.json.through` has not expired. The coverage probe matters even when a fresh download succeeds. No API key is required.
+
+## Development
 
 ```sh
 node --test tests/*.test.mjs
 python3 -m unittest discover -s tests -v
 python3 scripts/build.py
-python3 -m http.server 8000 --directory dist
-```
-
-Open `http://localhost:8000/`. The example trims lines, skips blanks and removes exact
-duplicates, preserving first-seen order and capitalization. It processes the text in tab memory. Update that explanation if your app behaves differently.
-
-CI also tests the browser flow and mobile layout at a project subpath. Replace the
-sample assertions in `tests/browser_smoke.py` when implementing your own UI. To run
-that check locally (optional for ordinary preview):
-
-```sh
-python3 -m venv .venv
-. .venv/bin/activate
-python3 -m pip install -r tests/browser-requirements.txt
-python3 -m playwright install --with-deps chromium
 python3 tests/browser_smoke.py
 ```
 
-Playwright is a test-only dependency; the app and its static build do not use it.
+The build is offline and content-versions local assets. Sixty-four compact stop-time buckets keep the browser from fetching the entire region's timetable for one stop. Source and build code use no runtime package dependency; Playwright is test-only. Pages uses GitHub Actions at the repository subpath, without a CNAME. Worker parser/gateway tests live with the shared hub service.
 
-## Expand or customize
+## Privacy
 
-Every implemented tool should replace this section with its actual configuration
-path and a working example. A small `config.json` can hold default entities,
-query presets, source choices and request limits. Those defaults should be useful
-starting points, while visitors can enter other valid inputs whenever the source
-supports them. Keep provider limits explicit and separate from the starter list.
-
-Derive counts, filters and item validation from the current data. Do not require
-exactly the initial number of items. Add a test that expands the configuration,
-and keep historical captures readable when their coverage differs from today's
-watchlist. Display the selected capture date accurately.
-
-Document which changes need only a normal code push and which also need a data
-refresh. Include the refresh command or exact GitHub workflow and input, followed
-by the publication step. A successful code build need not mean a new collection
-has been fetched. The starter itself has no external collection or refresh.
-
-## Publish and register
-
-When the actual tool is ready, in the **new tool repository** set **Settings → Pages → Build and deployment →
-Source → GitHub Actions**. Push to `main`, or manually run **Browser tool · Check and
-publish** after enabling Pages. If the initial deployment ran before Pages was enabled,
-enable it and rerun. PRs only check/build and provide a downloadable preview artifact.
-
-Keep `{{VISIT_COUNTER}}` in the page head and `{{ISSUE_LINK}}` in the footer when replacing the starter UI. The build enables these for initialized CoolCode repositories. The shared counter records aggregate opens on coolcode.ca by public tool ID. Toolbox inputs and URL parameters are excluded. The issue link opens a reporting form with the tool already selected.
-
-Keep app-owned asset paths and module imports relative. Check `https://coolcode.ca/my-tool/`.
-Do not add a CNAME or set `coolcode.ca` as this project's custom domain; the account
-site supplies it. Only successful `main` builds deploy.
-
-After verifying the app, copy the reviewed object from `tool.json` into `data/tools.json`
-in [the main site](https://github.com/jsdyer/jsdyer.github.io). Each tool still builds
-independently. The hub generates the visitor Worker ID list, watchdog targets and sitemap; deploy and verify the affected services before considering the release complete. Update the hub record when listing metadata changes; the hub is the
-authority for discovery. Every change must follow the [mandatory lifecycle](https://github.com/jsdyer/jsdyer.github.io/blob/main/docs/tool-lifecycle.md). App-only changes may leave integrations unchanged, but this must be checked; documentation, source fields, schedules and registration changes also require the hub update.
-
-The main site separates **Use in your browser** from **Install yourself**. An app
-that asks for a file is still a browser tool. Standalone Linux packages should start
-in their own repositories with their own build/release workflow, rather than copying
-this browser-only scaffold. Their hub record uses `access: "install"`, links to an
-installation guide, and includes `requirements`.
-
-## Files
-
-| Path | Purpose |
-| --- | --- |
-| `tool.json` | Page metadata and a ready-to-copy catalogue record |
-| `web/` | HTML, responsive CSS, DOM interactions and separate model logic |
-| `scripts/build.py` | Escape metadata and build `web/` into `dist/` |
-| `scripts/init.py` | Set a new project's identity |
-| `scripts/add_schedule_guard.py` | Add an opt-in guard for explicitly selected scheduled collectors |
-| `tests/` | Application and builder tests |
-| `.github/workflows/pages.yml` | Check PRs and publish successful main builds |
-| `AGENTS.md` | Instructions for future coding work |
-
-Namespace optional storage as `coolcode:<tool-id>:<key>`; CoolCode paths share a
-browser origin. Don't save pasted text/uploads by default. Document external APIs
-and send only the information needed for the selected action. Never embed secrets.
-
-Scheduled refresh is opt-in. Validate source data before deploying, display its date,
-and preserve the last good deployment on failure. Public-repository schedules can
-stop after 60 days without repository activity.
-
-When adding a collector with `on.schedule`, also keep `workflow_dispatch` available
-for the independent Linux server scheduler. Generate a separate schedule guard,
-listing every scheduled collector in the repository:
-
-```sh
-python3 scripts/add_schedule_guard.py --repository jsdyer/my-tool .github/workflows/pages.yml
-```
-
-Replace the repository and workflow paths with the real values. Review the generated
-allowlist, commit `.github/workflows/schedule-guard.yml`, and verify its first push
-run. Re-run the command with the complete list when adding, renaming or removing a
-collector. The guard runs weekly, independently of collector failures, and calls
-GitHub's enable-workflow API for those paths and itself. It restores workflows
-disabled for inactivity and preserves manually disabled workflows. It does not
-fetch data, create dummy commits or change source/check timestamps.
-
-This is an interim mitigation: GitHub does not document active-workflow renewal as
-a permanent exemption, and scheduled runs can be delayed or dropped. Register the
-collector and its freshness expectations in the independent server scheduler too.
-Document its real data check, collection and publication steps in the tool README.
-The starter has no scheduled collector and therefore ships no recurring guard job.
-
-Templates don't propagate future edits automatically. Adopt fixes explicitly and
-consider a versioned reusable workflow once several tools confirm the shared process.
-Choose and add the intended software license before distributing a new project.
-
-## Search metadata
-
-Initialize the page title with a concise task phrase, while keeping the creative
-app name in `--title`:
-
-```sh
-python3 scripts/init.py line-cleaner --title "Line Cleaner" --description "Trim lines and remove exact duplicates in your browser." --search-title "Trim Lines & Remove Duplicates"
-```
-
-The build adds static `WebApplication` JSON-LD, a free CAD offer and social metadata.
-For initialized jsdyer tools it also adds the canonical CoolCode URL. Forks and the
-uninitialized template do not claim a CoolCode canonical. Review the application
-category in `scripts/build.py` when adapting the tool; the starter is a utility.
-Do not invent ratings or reviews. Search markup does not guarantee a rich result.
-
-For a saved public dataset, pass Dataset objects to `add_search_metadata` from the
-app builder, with actual source attribution, licence, coverage and download URLs.
-Derive counts and dates from the same snapshot used by the app and show those details
-on the page. Keep source edition, retrieval and page-build time distinct. Omit an
-unknown source modification date instead of setting it to the current build time.
-Read the hub's `docs/search-discovery.md` for the release checklist.
+Search, timetable selection and nearest-stop calculations run locally. Selecting a stop sends its public ID to CoolCode’s gateway. Optional geolocation stays in the browser. Only an explicit “Save stop” action stores IDs in `coolcode:halifaxnext:stops`; “Clear saved stops” removes them. No cookies or account are needed. Opening the map requests public tiles from OpenStreetMap. Aggregate tool visits exclude stop queries and coordinates.
