@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "api": "https://coolcode.ca/api/halifaxnext/realtime",
+  "api": "https://coolcode-visitor-api.jeffdyer.workers.dev/api/halifaxnext/realtime",
   "default_stop": "8330",
   "poll_seconds": 60,
   "stale_seconds": 180,

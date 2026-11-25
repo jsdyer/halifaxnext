@@ -25,8 +25,13 @@ def main():
                 page.clock.install(time=frozen)
                 def api(route):
                     feed=parse_qs(urlparse(route.request.url).query)['feed'][0]
-                    route.fulfill(status=200,content_type='application/json',body=json.dumps({'fetched_at':'2026-11-25T17:00:00Z','data':{'schema':1,'feed':feed,'timestamp':int(frozen.timestamp()),'entities':[]}}))
-                page.route('https://coolcode.ca/api/**',api)
+                    def varint(n):
+                        values=[]
+                        while n>=128:values.append((n&127)|128);n>>=7
+                        return bytes(values+[n])
+                    header=bytes([10,3])+b'2.0'+bytes([24])+varint(int(frozen.timestamp()))
+                    route.fulfill(status=200,content_type='application/x-protobuf',headers={'X-CoolCode-Fetched-At':frozen.isoformat()},body=bytes([10])+varint(len(header))+header)
+                page.route('https://coolcode-visitor-api.jeffdyer.workers.dev/api/**',api)
                 page.goto(f'http://127.0.0.1:{server.server_port}/halifaxnext/')
                 page.wait_for_selector('.departure')
                 assert 'Spring Garden' in page.locator('#stop-title').inner_text()
@@ -40,7 +45,9 @@ def main():
                 page.locator('#search').fill('<img src=x onerror=alert(1)>')
                 assert page.locator('#stop-results img').count()==0
                 assert '0 matching' in page.locator('#search-status').inner_text()
-                assert 'positions' in page.locator('#vehicle-status').inner_text()
+                page.wait_for_function("document.querySelector('#vehicle-status').textContent.includes('no vehicle positions')")
+                page.locator('#auto-live').uncheck()
+                assert not page.locator('#auto-live').is_checked()
                 page.locator('#clear-saved').evaluate('(el)=>el.click()')
                 assert page.evaluate("JSON.parse(localStorage.getItem('coolcode:halifaxnext:stops')).length") == 0
                 page.screenshot(path=str(screenshots/'desktop.png'),full_page=True)

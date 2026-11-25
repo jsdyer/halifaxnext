@@ -18,7 +18,7 @@ Official public real-time feeds:
 - `https://gtfs.halifax.ca/realtime/TripUpdate/TripUpdates.pb`
 - `https://gtfs.halifax.ca/realtime/Alert/Alerts.pb`
 
-The shared CoolCode Worker exposes `GET /api/halifaxnext/realtime?feed=trips&stop=8330` and `feed=vehicles` / `feed=alerts`. It validates and normalizes bounded GTFS-realtime messages, caches source captures for 30 seconds, and returns `fetched_at` separately from the source's Unix-second `data.timestamp`. Valid empty, stale, missing and failed feeds stay distinct. The page polls once per minute while visible. Predictions older than three minutes fall back to explicitly labelled timetable times. Cancelled trips, skipped stops, service dates, negative delays and sequence-only updates are handled. Timetable times use GTFS service-day semantics, including hours after 24:00 and calendar exceptions. The tool does not infer that a missing prediction is on time.
+The shared CoolCode Worker at `https://coolcode-visitor-api.jeffdyer.workers.dev` exposes `GET /api/halifaxnext/realtime?feed=trips&stop=8330` and `feed=vehicles` / `feed=alerts`. It relays bounded GTFS-realtime messages from fixed official URLs and caches source captures for 30 seconds in Cloudflare Cache API. The `X-CoolCode-Fetched-At` response header records the gateway capture time. A dedicated browser worker decodes the protobuf, extracts the source timestamp and filters stop predictions; heavy parsing does not consume edge CPU. Older JSON gateway responses remain compatible. Valid empty, stale, missing and failed feeds stay distinct. The page polls once per minute while visible, with an explicit pause control to save mobile data. Predictions older than three minutes fall back to explicitly labelled timetable times. Cancelled trips, skipped stops, service dates, negative delays and sequence-only updates are handled. Timetable times use GTFS service-day semantics, including hours after 24:00 and calendar exceptions. The tool does not infer that a missing prediction is on time.
 
 Data: [Halifax Open Data Licence](https://data-hrm.hub.arcgis.com/pages/open-data-licence). Independent information, with no affiliation or endorsement. Positions and predictions can be incomplete, especially ferry service. Check [Halifax Transit](https://www.halifax.ca/transportation/halifax-transit) for travel decisions. Street-map tiles are © OpenStreetMap contributors.
 
@@ -37,7 +37,7 @@ python3 scripts/build.py
 python3 tests/browser_smoke.py
 ```
 
-The build is offline and content-versions local assets. Sixty-four compact stop-time buckets keep the browser from fetching the entire region's timetable for one stop. Source and build code use no runtime package dependency; Playwright is test-only. Pages uses GitHub Actions at the repository subpath, without a CNAME. Worker parser/gateway tests live with the shared hub service.
+The build is offline and content-versions local assets. Sixty-four compact stop-time buckets keep the browser from fetching the entire region's timetable for one stop. Source and build code use no runtime package dependency; Playwright is test-only. Pages uses GitHub Actions at the repository subpath, without a CNAME. Gateway tests live with the shared hub service; parser and instance-handling tests live in this repository.
 
 ## Privacy
 
