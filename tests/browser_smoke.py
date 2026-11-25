@@ -19,10 +19,13 @@ def main():
                 browser=p.chromium.launch(executable_path=os.getenv('CHROMIUM_PATH'))
                 page=browser.new_page(viewport={'width':1280,'height':1000});errors=[]
                 page.on('pageerror',lambda error:errors.append(str(error)))
-                page.clock.install(time=__import__('datetime').datetime(2026,11,25,17,0,tzinfo=__import__('datetime').timezone.utc))
+                edition=json.loads((ROOT/'web/data/index.json').read_text())
+                capture_day=max(edition['start'], min(edition['retrieved'][:10], edition['through']))
+                frozen=__import__('datetime').datetime.fromisoformat(capture_day+'T17:00:00+00:00')
+                page.clock.install(time=frozen)
                 def api(route):
                     feed=parse_qs(urlparse(route.request.url).query)['feed'][0]
-                    route.fulfill(status=200,content_type='application/json',body=json.dumps({'fetched_at':'2026-11-25T17:00:00Z','data':{'schema':1,'feed':feed,'timestamp':1795626000,'entities':[]}}))
+                    route.fulfill(status=200,content_type='application/json',body=json.dumps({'fetched_at':'2026-11-25T17:00:00Z','data':{'schema':1,'feed':feed,'timestamp':int(frozen.timestamp()),'entities':[]}}))
                 page.route('https://coolcode.ca/api/**',api)
                 page.goto(f'http://127.0.0.1:{server.server_port}/halifaxnext/')
                 page.wait_for_selector('.departure')

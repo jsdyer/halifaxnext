@@ -8,17 +8,28 @@ export function matchingStops(index,query='',route=''){const terms=query.trim().
 export function feedState(result,now=Date.now(),maxAge=180){if(!result?.data||!Array.isArray(result.data.entities)||!Number.isFinite(result.data.timestamp))return 'unavailable';const age=now/1000-result.data.timestamp;return age>maxAge||age< -60?'stale':result.data.entities.length?'live':'empty'}
 export function scheduled(index,stopRows,date,route=''){const epoch=serviceEpoch(date);return stopRows.filter(row=>row[3]!==1).flatMap(row=>{const [tripIndex,seconds,sequence]=row,t=index.trips[tripIndex];if(!t||route&&t[1]!==route||!activeService(index.services[t[2]],date))return [];return [{trip:t[0],route:t[1],headsign:t[3],date,sequence,scheduled:epoch+seconds*1000,time:epoch+seconds*1000,kind:'scheduled',seconds}]})}
 export function withLive(rows,stop,result,now=Date.now(),maxAge=180){if(!['live','empty'].includes(feedState(result,now,maxAge)))return rows;return rows.map(row=>{const update=result.data.entities.find(e=>e.trip.id===row.trip&&(!e.trip.date||e.trip.date===row.date.replaceAll('-','')));if(!update)return row;
-  if(update.timestamp&&Math.abs(now/1000-update.timestamp)>maxAge)return row;
+  const stopUpdate=r=>update.stops.find(s=>s.sequence!==null&&s.sequence!==undefined?s.sequence===r.sequence&&(!s.id||s.id===stop):s.id===stop);
+  const s=stopUpdate(row);
+  // An optional start_date must not apply one prediction to several service days.
+  if(!update.trip.date){
+    const candidates=rows.filter(r=>r.trip===row.trip&&r.sequence===row.sequence);
+    if(candidates.length>1){const absolute=s?.departure?.time??s?.arrival?.time;
+      if(!Number.isFinite(absolute))return row;
+      const distances=candidates.map(r=>({r,d:Math.abs(r.scheduled-absolute*1000)})).sort((a,b)=>a.d-b.d);
+      if(distances[0].d>12*3600000||distances[1]?.d===distances[0].d||distances[0].r.date!==row.date)return row;
+    }
+  }
+  // Cancellation/deletion is retained in the fresh full feed even when announced earlier.
   if(update.trip.relationship===7)return {...row,kind:'deleted'};
   if(update.trip.relationship===3)return {...row,kind:'cancelled'};
-  const s=update.stops.find(s=>s.id===stop||!s.id&&s.sequence===row.sequence);
+  if(update.timestamp&&Math.abs(now/1000-update.timestamp)>maxAge)return row;
   if(s?.relationship===1)return {...row,kind:'skipped'};
   if(s?.relationship===2)return row;
   const event=s?.departure?.time!==null&&s?.departure?.time!==undefined||s?.departure?.delay!==null&&s?.departure?.delay!==undefined?s.departure:s?.arrival;
   const time=Number.isFinite(event?.time)?event.time*1000:Number.isFinite(event?.delay)?row.scheduled+event.delay*1000:Number.isFinite(update.delay)?row.scheduled+update.delay*1000:null;
   return time===null?row:{...row,time,kind:'live',uncertainty:event?.uncertainty??null};
 })}
-export function departures(index,stopRows,stop,date,route,live,now=Date.now(),maxAge=180){const today=localDate(now),days=date===today?[addDay(date,-1),date,addDay(date,1)]:[date];const rows=days.flatMap(d=>d>=index.start&&d<=index.through?scheduled(index,stopRows,d,route):[]);const updated=date===today?withLive(rows,stop,live,now,maxAge):rows;return updated.filter(r=>r.kind!=='deleted'&&(date!==today||Math.max(r.time,r.scheduled)>=now-30000)).sort((a,b)=>a.time-b.time||a.route.localeCompare(b.route))}
+export function departures(index,stopRows,stop,date,route,live,now=Date.now(),maxAge=180){const today=localDate(now),days=date===today?[addDay(date,-1),date,addDay(date,1)]:[date];const rows=days.flatMap(d=>d>=index.start&&d<=index.through?scheduled(index,stopRows,d,route):[]);const updated=date===today?withLive(rows,stop,live,now,maxAge):rows;return updated.filter(r=>r.kind!=='deleted'&&(date!==today||(r.kind==='live'?r.time:r.scheduled)>=now-30000)).sort((a,b)=>a.time-b.time||a.route.localeCompare(b.route))}
 export function activeAlerts(result,stop,routes,now=Date.now()){if(!result?.data?.entities)return [];const t=now/1000;return result.data.entities.filter(a=>(!a.periods.length||a.periods.some(p=>(p.start===null||p.start<=t)&&(p.end===null||p.end>t)))&&(!a.targets.length||a.targets.some(x=>(!x.stop||x.stop===stop)&&(!x.route||routes.includes(x.route)))))}
 export function safeLink(value){try{const u=new URL(value);return u.protocol==='https:'?u.href:null}catch{return null}}
 export function mercator(lat,lon,zoom){const n=2**zoom*256,clamped=Math.max(-85,Math.min(85,lat)),s=Math.sin(clamped*Math.PI/180);return {x:(lon+180)/360*n,y:(.5-Math.log((1+s)/(1-s))/(4*Math.PI))*n}}
