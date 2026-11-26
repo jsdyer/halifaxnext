@@ -15,3 +15,10 @@ test('DELETED trips are removed from the passenger board',()=>{const i={start:'2
 test('fresh full feed retains an earlier cancellation or deletion announcement',()=>{const u=update();u.data.entities[0].timestamp=now/1000-600;u.data.entities[0].trip.relationship=3;assert.equal(withLive([row],'s',u,now)[0].kind,'cancelled');u.data.entities[0].trip.relationship=7;assert.equal(withLive([row],'s',u,now)[0].kind,'deleted')});
 test('undated absolute prediction is assigned to only the nearest service instance',()=>{const u=update();u.data.entities[0].trip.date='';const rows=[{...row,date:'2026-11-24',scheduled:row.scheduled-86400000},{...row},{...row,date:'2026-11-26',scheduled:row.scheduled+86400000}];const applied=withLive(rows,'s',u,now);assert.equal(applied.filter(r=>r.kind==='live').length,1);assert.equal(applied[1].kind,'live')});
 test('an early live departure already in the past is not retained until timetable time',()=>{const i={start:'2026-11-25',through:'2026-11-25',trips:[['t','1','s','Destination']],services:{s:{start:'2026-11-25',end:'2026-11-25',days:[1,1,1,1,1,1,1],exceptions:{}}}};const u=update();u.data.entities[0].stops[0].departure.time=now/1000-120;assert.equal(departures(i,[[0,13*3600+120,3,0]],'s','2026-11-25','',u,now).length,0)});
+
+test('a ferry trip ending at a terminal cannot board there even when its source pickup flag is zero', () => {
+  const sample = {trips:[['inbound','FerW','work','FERRY TO WOODSIDE'],['outbound','FerW','work','FERRY TO HALIFAX']],
+    services:{work:service}, ferry_final_sequences:{inbound:5,outbound:9}};
+  const rows = [[0,36000,5,0],[1,36300,3,0]];
+  assert.deepEqual(scheduled(sample,rows,'2026-11-26').map(r => r.trip), ['outbound']);
+});

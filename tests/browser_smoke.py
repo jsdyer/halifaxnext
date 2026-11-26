@@ -63,6 +63,12 @@ def main():
                 assert case_page.locator('link[rel="canonical"]').get_attribute('href') == 'https://coolcode.ca/halifaxnext/alderney-ferry.html'
                 assert case_page.locator('h1').inner_text() in case_page.title()
                 assert case_page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+                for slug,code in [('halifax-ferry-terminal','1073'),('woodside-ferry','1075')]:
+                    case_page.goto(f'http://127.0.0.1:{server.server_port}/halifaxnext/{slug}.html')
+                    case_page.wait_for_function("code => document.querySelector('#stop-code').textContent.includes(code)", arg=code)
+                    assert case_page.locator('link[rel="canonical"]').get_attribute('href') == 'https://coolcode.ca/halifaxnext/' + slug + '.html'
+                    assert code in case_page.locator('.place-evidence').inner_text()
+                    assert case_page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
                 browser.close()
         finally:server.shutdown()
     print('Browser checks passed: schedule, ferries, persisted favourites, safe text, subpath and mobile layout')

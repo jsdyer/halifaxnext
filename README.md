@@ -8,6 +8,13 @@ Search any passenger stop by its number or street, filter by route, inspect a se
 Search 8330 for Spring Garden Road before Dresden Row, or open a ferry-terminal shortcut. Live labels require a fresh source prediction; scheduled times are timetable entries, and a missing position does not mean a trip is cancelled. Last service uses the selected service date, including trips after midnight.
 <!-- /coolcode:guide -->
 
+The ferry board excludes a trip’s final stop even when the source permits pickup there. This keeps inbound terminal arrivals out of the departures list.
+
+Direct examples
+
+- [Halifax Ferry Terminal Departures](https://coolcode.ca/halifaxnext/halifax-ferry-terminal.html)
+- [Woodside Ferry Departures to Halifax](https://coolcode.ca/halifaxnext/woodside-ferry.html)
+
 ## Sources, dates and limits
 
 [Halifax Transit static GTFS](https://gtfs.halifax.ca/static/google_transit.zip) supplies every passenger stop, route, service calendar, exception date and stop time. The initial edition has 81 routes, 2,347 passenger stops, 9,239 trips and 324,165 stop times, including Alderney and Woodside ferries. Eleven parent-station records are omitted from boarding-stop search. Counts come from each edition, not a fixed list. The current edition ends November 29, 2026; **retrieving it again does not extend that validity**. Dates outside the edition never receive a fabricated timetable.

@@ -44,10 +44,10 @@ async function start(){const responses=await Promise.all([fetch('./config.json')
  $('coverage').textContent='Official schedule '+index.edition+' covers '+index.start+' to '+index.through+'. Download checked '+new Date(index.retrieved).toLocaleString('en-CA',{timeZone:ZONE})+' Halifax time. '+index.trips.length.toLocaleString()+' trips; '+index.stop_times.toLocaleString()+' stop times. Daily checks do not extend the source’s valid date range.';
  $('search').oninput=search;$('route').onchange=()=>{search();shown=15;render()};$('date').onchange=()=>{shown=15;render()};$('refresh').onclick=refresh;$('more').onclick=()=>{shown+=30;render()};$('save').onclick=()=>{if(!stop)return;saved=saved.includes(stop.id)?saved.filter(id=>id!==stop.id):[...saved,stop.id].slice(-30);savePrefs()};$('clear-saved').onclick=()=>{saved=[];savePrefs()};$('map-toggle').onclick=()=>{mapOpen=!mapOpen;$('map').hidden=!mapOpen;$('map-toggle').textContent=mapOpen?'Hide street map':'Show street map';renderVehicles()};$('nearby').onclick=()=>{if(!navigator.geolocation){$('search-status').textContent='Location is unavailable in this browser.';return}$('search-status').textContent='Waiting for your browser’s location permission…';navigator.geolocation.getCurrentPosition(p=>{const lat=p.coords.latitude,lon=p.coords.longitude,s=[...index.stops].sort((a,b)=>((a.lat-lat)**2+(a.lon-lon)**2*Math.cos(lat*Math.PI/180)**2)-((b.lat-lat)**2+(b.lon-lon)**2*Math.cos(lat*Math.PI/180)**2))[0];if(Math.abs(s.lat-lat)+Math.abs(s.lon-lon)>1){$('search-status').textContent='Your location is outside the Halifax stop network. Search a street or stop number instead.';return}$('search').value=s.id;choose(s.id)},()=>{$('search-status').textContent='Location was not available. Search a street or stop number instead.'},{timeout:12000,maximumAge:60000})};
  const stopParam = query.get('stop');
- const alderney = document.body.dataset.useCase === 'alderney-ferry';
- const initial = index.stops.some(s => s.id === stopParam) ? stopParam : alderney ? '1074' : saved[0] || config.default_stop || index.stops[0].id;
- if (alderney && !index.stops.some(s=>s.id===initial)) {
-   $('stop-title').textContent = 'Alderney Ferry Terminal is unavailable in this schedule';
+ const preset = document.body.dataset.presetStop;
+ const initial = index.stops.some(s => s.id === stopParam) ? stopParam : preset || saved[0] || config.default_stop || index.stops[0].id;
+ if (preset && !index.stops.some(s => s.id === initial)) {
+   $('stop-title').textContent = 'The selected ferry stop is unavailable in this schedule';
  } else {
    await choose(initial);
  }
