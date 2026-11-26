@@ -42,3 +42,7 @@ The build is offline and content-versions local assets. Sixty-four compact stop-
 ## Privacy
 
 Search, timetable selection and nearest-stop calculations run locally. Selecting a stop sends its public ID to CoolCode’s gateway. Optional geolocation stays in the browser. Only an explicit “Save stop” action stores IDs in `coolcode:halifaxnext:stops`; “Clear saved stops” removes them. No cookies or account are needed. Opening the map requests public tiles from OpenStreetMap. Aggregate tool visits exclude stop queries and coordinates.
+
+## Ready-to-use example
+
+[Alderney Ferry Departures to Halifax](https://coolcode.ca/halifaxnext/alderney-ferry.html) opens this scenario in the same tool. See departures from Alderney Landing in Dartmouth, stop 1074, toward downtown Halifax. The board uses Halifax local time. Each departure identifies the available schedule or live update.
