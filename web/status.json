@@ -1,11 +1,11 @@
 {
-  "retrieved": "2026-11-27T18:14:12Z",
-  "start": "2026-08-24",
-  "through": "2026-11-29",
-  "edition": "2026_08_August_20260806",
-  "sha256": "f5d95091c8134716834734e2695b16689fd19c2302932e147c7075c6a9f6bb76",
-  "stop_times": 324165,
+  "retrieved": "2026-11-28T10:23:53Z",
+  "start": "2026-11-30",
+  "through": "2027-02-21",
+  "edition": "2026_11_November_20261118",
+  "sha256": "410466dc3b002cc46e173ed5d365543564c8575605dc39b586ec80e71a244c09",
+  "stop_times": 496508,
   "routes": 81,
-  "stops": 2347,
-  "trips": 9239
+  "stops": 2360,
+  "trips": 14002
 }
